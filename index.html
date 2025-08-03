@@ -1,245 +1,151 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Camplan 3D/AR 제품 미리보기</title>
-    <style>
-        /* Body 기본 스타일: 뷰어 화면을 중앙에 배치하고 전체 화면 사용 */
-        body {
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background-color: #f0f0f0; /* 배경색 설정 */
-            font-family: sans-serif;
-            overflow: hidden; /* 스크롤바 숨김 */
-            position: relative; /* 자식 요소의 absolute 위치를 위한 기준 */
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>상품 3D/AR 미리보기</title>
 
-        /* Three.js 뷰어 컨테이너 (PC용) - JavaScript에서 display 제어 */
-        #viewer-container {
-            width: 600px;
-            height: 600px;
-            border: 1px solid #ccc;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            position: relative;
-            background-color: #ffffff;
-            border-radius: 8px;
-            overflow: hidden;
-            cursor: grab;
-            display: none;
-            touch-action: none; /* 터치 이벤트 기본 동작 방지 */
-            /* 초기 display는 JavaScript에서 isMobile에 따라 설정됩니다. */
-        }
-        #viewer-container.grabbing { cursor: grabbing; }
-        #viewer-container canvas { display: block; width: 100% !important; height: 100% !important; }
-        #info { position: absolute; top: 10px; width: 100%; text-align: center; color: #333; text-shadow: none; z-index: 1; }
-        .error-message {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: red; background-color: rgba(255, 255, 255, 0.9); padding: 20px;
-            border: 1px solid black; border-radius: 8px; text-align: center;
-            font-size: 1.1em; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10;
-        }
+  <!-- ✅ 상품 고유 코드 (예: 상품 상세페이지에서 서버에서 삽입) -->
+  <meta name="product-code" content="{$product-code}" />
 
-        /* Google Model Viewer 태그 (모바일 AR용) - JavaScript에서 display 제어 */
-        model-viewer {
-            width: 100%;
-            
-            height: 100vh; /* 뷰포트 높이 전체를 사용 */
-             --ar-button-display: block;
-            --background-color: #f0f0f0; /* Model Viewer 자체의 배경색 */
-            /* 초기 display는 JavaScript에서 isMobile에 따라 설정됩니다. */
-        }
+  <!-- ✅ model-viewer for Mobile -->
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/1.12.0/model-viewer.min.js"></script>
 
-        /* AR 버튼 스타일: model-viewer 내부에 삽입될 버튼 */
-        button[slot="ar-button"] {
-            background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px;
-            cursor: pointer; font-size: 1em; position: absolute; bottom: 20px; left: 50%;
-            transform: translateX(-50%); z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            transition: background-color 0.3s ease;
-        }
-        button[slot="ar-button"]:hover { background-color: #45a049; }
-    </style>
+  <!-- ✅ Three.js importmap -->
+  <script type="importmap">
+    
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.166.1/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.166.1/examples/jsm/"
+      }
+    }
+  </script>
 
-    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/1.12.0/model-viewer.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: #f4f4f4;
+      overflow: hidden;
+    }
 
+    #viewer-container {
+      width: 600px;
+      height: 600px;
+      display: none;
+      position: relative;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    model-viewer {
+      width: 100%;
+      height: 100vh;
+      display: none;
+      --ar-button-display: block;
+    }
+
+    button[slot="ar-button"] {
+      background: #4CAF50;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+    }
+  </style>
 </head>
 <body>
 
-    <div id="viewer-container">
-        <div id="info">마우스를 드래그하여 모델을 360도로 회전하세요. (터치 가능)</div>
-        </div>
+  <!-- PC용 뷰어 -->
+  <div id="viewer-container"></div>
 
-    <model-viewer
-        id="camplan-ar-viewer"
-        src="http://3.39.23.216/images/texter.glb"      ios-src="http://3.39.23.216/images/texter.usdz" alt="Camplan 감성 캠핑 테이블"
-        ar
-        ar-modes="webxr scene-viewer quick-look"
-        camera-controls
-        shadow-intensity="1"
-        preload  autoplay
-        disable-zoom
-        exposure="1"
-        disable-pan
-        environment-image="neutral"
-        auto-rotate
-        rotation-per-second="10deg"
-    >
-        <button slot="ar-button">
-            AR로 미리보기
-        </button>
-    </model-viewer>
+  <!-- 모바일용 Model Viewer -->
+  <model-viewer
+    id="mobile-model"
+    ar
+    ar-modes="webxr scene-viewer quick-look"
+    camera-controls
+    auto-rotate
+    exposure="1"
+    shadow-intensity="1"
+    disable-pan
+    disable-zoom
+    environment-image="neutral"
+  >
+    <button slot="ar-button">AR로 보기</button>
+  </model-viewer>
 
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.166.1/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.166.1/examples/jsm/"
-            }
-        }
-    </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const productCode = document.querySelector('meta[name="product-code"]').content;
 
-        // 요소 가져오기
-        const viewerContainer = document.getElementById('viewer-container');
-        const modelViewerElement = document.getElementById('camplan-ar-viewer'); // Model Viewer 요소
+    const glbUrl = `https://camplan0801.cafe24.com//models/${productCode}.glb`;
+    const usdzUrl = `https://camplan0801.cafe24.com//${productCode}.usdz`;
+    console.log(glbUrl);
+    console.log(usdzUrl);
+    const modelViewer = document.getElementById("mobile-model");
+    const viewerContainer = document.getElementById("viewer-container");
 
-        // 사용자 에이전트(User-Agent)로 모바일 여부 감지 (간단한 방법)
-        const isMobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      modelViewer.setAttribute("src", glbUrl);
+      modelViewer.setAttribute("ios-src", usdzUrl);
+      modelViewer.style.display = "block";
+    } else {
+      viewerContainer.style.display = "block";
 
-        // DOMContentLoaded 이벤트 리스너 없이 바로 실행
-        // 이 방식이 더 빠르게 display를 제어할 수 있습니다.
-        if (isMobile) {
-            // 모바일일 경우: Three.js 뷰어 숨기고 Model Viewer 활성화
-            viewerContainer.style.display = 'none';
-            modelViewerElement.style.display = 'block';
-        } else {
-            // PC일 경우: Three.js 뷰어 활성화하고 Model Viewer 숨김
-            viewerContainer.style.display = 'flex'; // flex로 설정하여 내부 요소 정렬
-            modelViewerElement.style.display = 'none';
+      // --- Three.js 초기화 ---
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+      camera.position.set(0, 0, 5);
 
-            // --- PC용 Three.js 뷰어 초기화 및 로직 ---
-            let camera, scene, renderer;
-            let model;
-            let isDragging = false;
-            let previousClientX = 0; 
-            let previousClientY = 0; 
-            const ROTATION_SPEED_FACTOR = 0.008; 
-            
-            const VIEWER_WIDTH = 600;
-            const VIEWER_HEIGHT = 600;
-            const MIN_CAMERA_DISTANCE = 2;
-            const MAX_CAMERA_DISTANCE = 15;
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(600, 600);
+      viewerContainer.appendChild(renderer.domElement);
 
+      const ambient = new THREE.AmbientLight(0xffffff, 1.5);
+      scene.add(ambient);
 
-            function initThreeJS() {
-                scene = new THREE.Scene();
-                scene.background = new THREE.Color(0xdddddd);
+      const light = new THREE.DirectionalLight(0xffffff, 1.5);
+      light.position.set(5, 10, 7.5);
+      scene.add(light);
 
-                camera = new THREE.PerspectiveCamera(75, VIEWER_WIDTH / VIEWER_HEIGHT, 0.1, 1000);
-                camera.position.set(0, 0, 5);
-                camera.lookAt(0, 0, 0);
+      const loader = new GLTFLoader();
+      loader.load(glbUrl, (gltf) => {
+        const model = gltf.scene;
+        scene.add(model);
 
-                renderer = new THREE.WebGLRenderer({ antialias: true });
-                renderer.setSize(VIEWER_WIDTH, VIEWER_HEIGHT);
-                viewerContainer.appendChild(renderer.domElement);
+        // 모델 중앙 정렬
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const scale = 4.5 / maxDim;
+        model.position.sub(center);
+        model.scale.set(scale, scale, scale);
+      }, undefined, (err) => {
+        console.error('GLB 모델 로딩 실패:', err);
+      });
 
-                const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
-                scene.add(ambientLight);
-
-                const directionalLight = new THREE.DirectionalLight(0xffffff, 2.5);
-                directionalLight.position.set(5, 10, 7.5);
-                scene.add(directionalLight);
-
-                // --- 마우스 이벤트 핸들러 (PC용) ---
-                function handleStart(event, targetElement) {
-                    if (event.button === 0) { // 왼쪽 마우스 버튼
-                        isDragging = true;
-                        previousClientX = event.clientX;
-                        previousClientY = event.clientY;
-                        targetElement.classList.add('grabbing');
-                        document.addEventListener('mousemove', handleMove);
-                        document.addEventListener('mouseup', handleEnd);
-                    }
-                    event.preventDefault(); // 기본 동작 방지
-                }
-
-                function handleMove(event) {
-                    if (!model || !isDragging) return;
-
-                    const deltaX = event.clientX - previousClientX;
-                    model.rotation.y += deltaX * ROTATION_SPEED_FACTOR;
-                    previousClientX = event.clientX;
-
-                    const deltaY = event.clientY - previousClientY;
-                    model.rotation.x += deltaY * ROTATION_SPEED_FACTOR;
-                    previousClientY = event.clientY;
-                }
-
-                function handleEnd() {
-                    isDragging = false;
-                    viewerContainer.classList.remove('grabbing');
-                    document.removeEventListener('mousemove', handleMove);
-                    document.removeEventListener('mouseup', handleEnd);
-                }
-
-                // 이벤트 리스너 등록
-                renderer.domElement.addEventListener('mousedown', (event) => {
-                    handleStart(event, viewerContainer); 
-                });
-
-                viewerContainer.addEventListener('mouseleave', () => {
-                    if (!isDragging) { 
-                        viewerContainer.classList.remove('grabbing');
-                    }
-                });
-
-                // FBX 모델 로더
-                const loader = new FBXLoader();
-                const fbxPath = 'images/table.fbx'; // Three.js 뷰어용 FBX 파일 경로 (이것도 웹 경로여야 합니다!)
-
-                loader.load(fbxPath, (object) => {
-                    model = object;
-                    const box = new THREE.Box3().setFromObject(model);
-                    const center = box.getCenter(new THREE.Vector3());
-                    const size = box.getSize(new THREE.Vector3());
-                    
-                    // 모델 중심을 (0,0,0)으로 이동하여 회전 기준점 설정
-                    model.position.sub(center); 
-                    scene.add(model); 
-
-                    const maxDim = Math.max(size.x, size.y, size.z);
-                    const desiredViewSize = 5; 
-                    const scale = desiredViewSize / maxDim; 
-                    model.scale.set(scale, scale, scale);
-
-                    console.log('FBX 모델 로드 성공!');
-
-                }, (xhr) => {
-                    console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-                }, (error) => {
-                    console.error('FBX 모델 로드 중 에러 발생:', error);
-                    const errorDiv = document.createElement('div');
-                    errorDiv.className = 'error-message';
-                    errorDiv.innerHTML = `<strong>Error:</strong> Could not load 3D model.<br>File: ${fbxPath}<br>Check console (F12) for details.<br><br><strong>Hint:</strong> If viewing from local file (file:///), try running a local web server (e.g., 'python -m http.server').`;
-                    viewerContainer.appendChild(errorDiv); // viewerContainer 안에 에러 메시지 표시
-                });
-            }
-
-            function animateThreeJS() {
-                requestAnimationFrame(animateThreeJS);
-                renderer.render(scene, camera);
-            }
-            
-            initThreeJS();
-            animateThreeJS();
-        }
-    </script>
-    
+      const animate = () => {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+      };
+      animate();
+    }
+  </script>
 </body>
 </html>
